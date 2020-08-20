@@ -15,7 +15,7 @@
 </template>
 
 <script>
-import { PDFDocument } from 'pdf-lib';
+import { PDFDocument, rgb } from 'pdf-lib';
 import inBrowserDownload from 'in-browser-download';
 
 export default {
@@ -30,31 +30,46 @@ export default {
     async download(event) {
       event.preventDefault();
 
+      this.processPdf('/templates/master_light.pdf', 'light.pdf');
+      this.processPdf('/templates/master_dark.pdf', 'light.pdf');
+    },
+    async processPdf(path, name) {
       const templateBytesLight = new Uint8Array(
-        await fetch('/templates/master_light.pdf').then((r) => r.arrayBuffer()),
+        await fetch(path).then((r) => r.arrayBuffer()),
       );
-      const pdfLight = await PDFDocument.load(templateBytesLight);
 
-      const page = pdfLight.getPage(0);
+      const pdf = await PDFDocument.load(templateBytesLight);
 
-      let logo;
+      const page = pdf.getPage(0);
+
+      let logo = null;
 
       try {
-        logo = await pdfLight.embedPng(this.logo);
+        logo = await pdf.embedPng(this.logo);
       } catch {
-        logo = await pdfLight.embedJpg(this.logo);
+        logo = await pdf.embedJpg(this.logo);
       }
 
-      const logoDims = logo.scale(170 / logo.height);
+      if (logo) {
+        const logoDims = logo.scale(170 / logo.height);
 
-      page.drawImage(logo, {
-        x: page.getWidth() / 2 - logoDims.width / 2,
-        y: page.getHeight() - logoDims.height - 512,
-        width: logoDims.width,
-        height: logoDims.height,
+        page.drawImage(logo, {
+          x: page.getWidth() / 2 - logoDims.width / 2,
+          y: page.getHeight() - logoDims.height - 512,
+          width: logoDims.width,
+          height: logoDims.height,
+          opacity: 0.2,
+        });
+      }
+
+      page.drawText(this.name, {
+        x: 0,
+        y: page.getHeight() - 615,
+        size: 50,
+        color: rgb(0.33, 0.38, 0.74),
       });
 
-      inBrowserDownload((await pdfLight.save()).buffer, 'light.pdf');
+      inBrowserDownload((await pdf.save()).buffer, name);
     },
     async logoUpload(event) {
       this.logo = new Uint8Array(await event.target.files[0].arrayBuffer());
